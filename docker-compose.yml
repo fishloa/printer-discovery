@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  zebra-discovery:
+    build: .
+    image: ghcr.io/fishloa/zebra-discovery:latest
+    container_name: zebra-discovery
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - PRINTER_IP=192.168.30.4
+      - PRINTER_NAME=Zebra ZD621
+      - HELLO_INTERVAL=120
