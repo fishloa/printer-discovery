@@ -1,24 +1,38 @@
 # Zebra Discovery Service
 
-Docker-containerised service that broadcasts **Bonjour (mDNS/DNS-SD)** and **WS-Discovery** announcements for a Zebra ZD621 label printer so network clients auto-discover it.
+Docker-containerised service that broadcasts **Bonjour (mDNS/DNS-SD)** and **WS-Discovery** announcements for Zebra label printers so network clients auto-discover them.
 
 ## Key files
 
 | File | Purpose |
 |---|---|
 | `discovery.py` | Main service — mDNS registration (zeroconf) + WS-Discovery Hello/Probe/Resolve |
-| `docker-compose.yml` | Stack definition (host network, env vars) |
+| `config.json` | Printer list and settings (name, IP, location, hello interval) |
+| `docker-compose.yml` | Stack definition (host network) |
 | `Dockerfile` | Python 3.12-slim, installs zeroconf |
+| `.github/workflows/deploy.yml` | CI — build/push to GHCR, trigger Portainer redeploy |
 
-## Configuration (env vars)
+## Configuration
 
-- `PRINTER_IP` — printer's fixed IP (default `192.168.30.4`)
-- `PRINTER_NAME` — display name (default `Zebra ZD621`)
-- `HELLO_INTERVAL` — seconds between WS-Discovery Hello broadcasts (default `120`)
+Edit `config.json` to add/remove printers:
+```json
+{
+  "printers": [
+    { "name": "Zebra ZD621", "ip": "192.168.30.4", "location": "Alex Office Cupboard" }
+  ],
+  "hello_interval": 120
+}
+```
 
 ## Deployment
 
-Deployed via Portainer on **zelkova** (endpoint ID 2). The container uses `network_mode: host` for multicast access.
+- **Portainer stack ID:** `179` (zebra-discovery)
+- **Webhook UUID:** `8b8037ad-ddbe-43cb-a1c4-34ef4c83c694`
+- **Image:** `ghcr.io/fishloa/zebra-discovery:latest`
+- **CI:** Push to `main` → GitHub Actions builds image → pushes to GHCR → triggers Portainer webhook
+- **GitHub secret:** `PORTAINER_WEBHOOK_URL` stores the full webhook URL
+
+The container uses `network_mode: host` for multicast access on zelkova (endpoint ID 2).
 
 ## Protocols advertised
 
