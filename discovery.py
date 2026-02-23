@@ -3,7 +3,8 @@ Broadcast Bonjour (mDNS/DNS-SD) and WS-Discovery announcements
 for a Zebra ZD621 label printer at a fixed IP address.
 """
 
-import os
+import json
+import pathlib
 import uuid
 import socket
 import struct
@@ -23,76 +24,81 @@ logging.basicConfig(
 log = logging.getLogger("zebra-discovery")
 
 # ---------------------------------------------------------------------------
-# Configuration
+# Configuration — loaded from config.json
 # ---------------------------------------------------------------------------
-PRINTER_IP = os.environ.get("PRINTER_IP", "192.168.30.4")
-PRINTER_NAME = os.environ.get("PRINTER_NAME", "Zebra ZD621")
-HELLO_INTERVAL = int(os.environ.get("HELLO_INTERVAL", "120"))
+_cfg_path = pathlib.Path(__file__).parent / "config.json"
+with open(_cfg_path) as _f:
+    CONFIG = json.load(_f)
 
-# Deterministic UUID so the printer keeps the same identity across restarts
-DEVICE_UUID = uuid.uuid5(uuid.NAMESPACE_DNS, f"zebra-printer-{PRINTER_IP}")
+PRINTERS = CONFIG["printers"]
+HELLO_INTERVAL = CONFIG.get("hello_interval", 120)
 
-# mDNS hostname for the printer (no spaces, lowercase)
-MDNS_HOST = PRINTER_NAME.lower().replace(" ", "-") + ".local."
+# For WS-Discovery we advertise each printer separately
+# Generate a stable UUID per printer based on its IP
+def _device_uuid(ip: str) -> str:
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, ip))
 
 # ---------------------------------------------------------------------------
 # Bonjour / mDNS
 # ---------------------------------------------------------------------------
 
-def register_mdns() -> Zeroconf:
-    """Register mDNS service records advertising the printer."""
+def register_mdns(printers: list[dict]) -> Zeroconf:
+    """Register mDNS service records for every printer in the config."""
     zc = Zeroconf()
-    addr = socket.inet_aton(PRINTER_IP)
 
-    common_props = {
-        "txtvers": "1",
-        "product": f"({PRINTER_NAME})",
-        "ty": PRINTER_NAME,
-        "note": "",
-        "priority": "50",
-        "qtotal": "1",
-    }
+    for p in printers:
+        name = p["name"]
+        ip = p["ip"]
+        location = p.get("location", "")
+        addr = socket.inet_aton(ip)
+        mdns_host = name.lower().replace(" ", "-") + ".local."
 
-    # Raw TCP / ZPL printing on port 9100
-    raw_info = ServiceInfo(
-        "_pdl-datastream._tcp.local.",
-        f"{PRINTER_NAME}._pdl-datastream._tcp.local.",
-        addresses=[addr],
-        port=9100,
-        properties={
-            **common_props,
-            "pdl": "application/vnd.zebra-zpl,application/octet-stream",
-        },
-        server=MDNS_HOST,
-    )
+        common_props = {
+            "txtvers": "1",
+            "product": f"({name})",
+            "ty": name,
+            "note": location,
+            "priority": "50",
+            "qtotal": "1",
+        }
 
-    # IPP on port 631
-    ipp_info = ServiceInfo(
-        "_ipp._tcp.local.",
-        f"{PRINTER_NAME}._ipp._tcp.local.",
-        addresses=[addr],
-        port=631,
-        properties={
-            **common_props,
-            "pdl": "application/vnd.zebra-zpl,application/octet-stream",
-            "rp": "ipp/print",
-        },
-        server=MDNS_HOST,
-    )
+        raw_info = ServiceInfo(
+            "_pdl-datastream._tcp.local.",
+            f"{name}._pdl-datastream._tcp.local.",
+            addresses=[addr],
+            port=9100,
+            properties={
+                **common_props,
+                "pdl": "application/vnd.zebra-zpl,application/octet-stream",
+            },
+            server=mdns_host,
+        )
 
-    # LPD on port 515
-    lpd_info = ServiceInfo(
-        "_printer._tcp.local.",
-        f"{PRINTER_NAME}._printer._tcp.local.",
-        addresses=[addr],
-        port=515,
-        properties=common_props,
-        server=MDNS_HOST,
-    )
+        ipp_info = ServiceInfo(
+            "_ipp._tcp.local.",
+            f"{name}._ipp._tcp.local.",
+            addresses=[addr],
+            port=631,
+            properties={
+                **common_props,
+                "pdl": "application/vnd.zebra-zpl,application/octet-stream",
+                "rp": "ipp/print",
+            },
+            server=mdns_host,
+        )
 
-    for svc in (raw_info, ipp_info, lpd_info):
-        zc.register_service(svc)
-        log.info("mDNS registered: %s", svc.name)
+        lpd_info = ServiceInfo(
+            "_printer._tcp.local.",
+            f"{name}._printer._tcp.local.",
+            addresses=[addr],
+            port=515,
+            properties=common_props,
+            server=mdns_host,
+        )
+
+        for svc in (raw_info, ipp_info, lpd_info):
+            zc.register_service(svc)
+            log.info("mDNS registered: %s -> %s", svc.name, ip)
 
     return zc
 
@@ -112,9 +118,6 @@ WSD_NS = {
     "wprt": "http://schemas.microsoft.com/windows/2006/08/wdp/print",
 }
 
-# XAddrs — where clients will connect for metadata exchange
-XADDRS = f"http://{PRINTER_IP}/"
-
 # The <wsd:Types> we advertise (Device + PrintDeviceType)
 WSD_TYPES = "wsdp:Device wprt:PrintDeviceType"
 
@@ -128,7 +131,7 @@ def _next_msg_number() -> str:
     return str(_msg_number)
 
 
-def _build_hello() -> bytes:
+def _build_hello(device_uuid: str, xaddrs: str) -> bytes:
     """Build a WS-Discovery Hello SOAP envelope."""
     return f"""<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope
@@ -146,17 +149,17 @@ def _build_hello() -> bytes:
   <soap:Body>
     <wsd:Hello>
       <wsa:EndpointReference>
-        <wsa:Address>urn:uuid:{DEVICE_UUID}</wsa:Address>
+        <wsa:Address>urn:uuid:{device_uuid}</wsa:Address>
       </wsa:EndpointReference>
       <wsd:Types>{WSD_TYPES}</wsd:Types>
-      <wsd:XAddrs>{XADDRS}</wsd:XAddrs>
+      <wsd:XAddrs>{xaddrs}</wsd:XAddrs>
       <wsd:MetadataVersion>1</wsd:MetadataVersion>
     </wsd:Hello>
   </soap:Body>
 </soap:Envelope>""".encode("utf-8")
 
 
-def _build_probe_match(relates_to: str) -> bytes:
+def _build_probe_match(relates_to: str, device_uuid: str, xaddrs: str) -> bytes:
     """Build a WS-Discovery ProbeMatches response."""
     return f"""<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope
@@ -176,10 +179,10 @@ def _build_probe_match(relates_to: str) -> bytes:
     <wsd:ProbeMatches>
       <wsd:ProbeMatch>
         <wsa:EndpointReference>
-          <wsa:Address>urn:uuid:{DEVICE_UUID}</wsa:Address>
+          <wsa:Address>urn:uuid:{device_uuid}</wsa:Address>
         </wsa:EndpointReference>
         <wsd:Types>{WSD_TYPES}</wsd:Types>
-        <wsd:XAddrs>{XADDRS}</wsd:XAddrs>
+        <wsd:XAddrs>{xaddrs}</wsd:XAddrs>
         <wsd:MetadataVersion>1</wsd:MetadataVersion>
       </wsd:ProbeMatch>
     </wsd:ProbeMatches>
@@ -187,7 +190,7 @@ def _build_probe_match(relates_to: str) -> bytes:
 </soap:Envelope>""".encode("utf-8")
 
 
-def _build_resolve_match(relates_to: str) -> bytes:
+def _build_resolve_match(relates_to: str, device_uuid: str, xaddrs: str) -> bytes:
     """Build a WS-Discovery ResolveMatches response."""
     return f"""<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope
@@ -207,10 +210,10 @@ def _build_resolve_match(relates_to: str) -> bytes:
     <wsd:ResolveMatches>
       <wsd:ResolveMatch>
         <wsa:EndpointReference>
-          <wsa:Address>urn:uuid:{DEVICE_UUID}</wsa:Address>
+          <wsa:Address>urn:uuid:{device_uuid}</wsa:Address>
         </wsa:EndpointReference>
         <wsd:Types>{WSD_TYPES}</wsd:Types>
-        <wsd:XAddrs>{XADDRS}</wsd:XAddrs>
+        <wsd:XAddrs>{xaddrs}</wsd:XAddrs>
         <wsd:MetadataVersion>1</wsd:MetadataVersion>
       </wsd:ResolveMatch>
     </wsd:ResolveMatches>
@@ -235,10 +238,10 @@ def _make_wsd_socket() -> socket.socket:
     return sock
 
 
-def _send_hello(sock: socket.socket) -> None:
-    data = _build_hello()
+def _send_hello(sock: socket.socket, device_uuid: str, xaddrs: str) -> None:
+    data = _build_hello(device_uuid, xaddrs)
     sock.sendto(data, (WSD_MCAST_ADDR, WSD_MCAST_PORT))
-    log.info("WS-Discovery Hello sent (device %s)", DEVICE_UUID)
+    log.info("WS-Discovery Hello sent (device %s)", device_uuid)
 
 
 def _extract_message_id(data: bytes) -> str | None:
@@ -261,8 +264,8 @@ def _extract_action(data: bytes) -> str | None:
         return None
 
 
-def _is_resolve_for_us(data: bytes) -> bool:
-    """Check if a Resolve message targets our device UUID."""
+def _resolve_target_uuid(data: bytes) -> str | None:
+    """Return the target UUID from a Resolve message, or None."""
     try:
         root = ET.fromstring(data)
         addr = root.find(
@@ -270,13 +273,16 @@ def _is_resolve_for_us(data: bytes) -> bool:
             f"/{{{WSD_NS['wsa']}}}EndpointReference"
             f"/{{{WSD_NS['wsa']}}}Address"
         )
-        return addr is not None and str(DEVICE_UUID) in (addr.text or "")
+        return addr.text if addr is not None else None
     except ET.ParseError:
-        return False
+        return None
 
 
-def wsd_listener(sock: socket.socket, stop_event: threading.Event) -> None:
-    """Listen for WS-Discovery Probe/Resolve and respond."""
+def wsd_listener(sock: socket.socket, stop_event: threading.Event, printer_map: dict[str, str]) -> None:
+    """Listen for WS-Discovery Probe/Resolve and respond.
+
+    printer_map: {device_uuid: xaddrs} for all printers.
+    """
     sock.settimeout(1.0)
     while not stop_event.is_set():
         try:
@@ -293,24 +299,28 @@ def wsd_listener(sock: socket.socket, stop_event: threading.Event) -> None:
         if action.endswith("/Probe"):
             msg_id = _extract_message_id(data)
             if msg_id:
-                resp = _build_probe_match(msg_id)
-                # Unicast back to the sender
-                sock.sendto(resp, addr)
-                log.info("WS-Discovery ProbeMatch -> %s", addr)
+                for duuid, xaddrs in printer_map.items():
+                    resp = _build_probe_match(msg_id, duuid, xaddrs)
+                    sock.sendto(resp, addr)
+                log.info("WS-Discovery ProbeMatch -> %s (%d printers)", addr, len(printer_map))
 
         elif action.endswith("/Resolve"):
-            if _is_resolve_for_us(data):
-                msg_id = _extract_message_id(data)
-                if msg_id:
-                    resp = _build_resolve_match(msg_id)
-                    sock.sendto(resp, addr)
-                    log.info("WS-Discovery ResolveMatch -> %s", addr)
+            target = _resolve_target_uuid(data)
+            if target:
+                for duuid, xaddrs in printer_map.items():
+                    if duuid in target:
+                        msg_id = _extract_message_id(data)
+                        if msg_id:
+                            resp = _build_resolve_match(msg_id, duuid, xaddrs)
+                            sock.sendto(resp, addr)
+                            log.info("WS-Discovery ResolveMatch -> %s", addr)
 
 
-def wsd_hello_loop(sock: socket.socket, stop_event: threading.Event) -> None:
+def wsd_hello_loop(sock: socket.socket, stop_event: threading.Event, printer_map: dict[str, str]) -> None:
     """Periodically send WS-Discovery Hello messages."""
     while not stop_event.is_set():
-        _send_hello(sock)
+        for duuid, xaddrs in printer_map.items():
+            _send_hello(sock, duuid, xaddrs)
         stop_event.wait(HELLO_INTERVAL)
 
 
@@ -319,8 +329,13 @@ def wsd_hello_loop(sock: socket.socket, stop_event: threading.Event) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    log.info("Starting discovery for %s at %s", PRINTER_NAME, PRINTER_IP)
-    log.info("Device UUID: %s", DEVICE_UUID)
+    # Build printer map for WS-Discovery: {uuid: xaddrs}
+    printer_map: dict[str, str] = {}
+    for p in PRINTERS:
+        duuid = _device_uuid(p["ip"])
+        xaddrs = f"http://{p['ip']}/"
+        printer_map[duuid] = xaddrs
+        log.info("Printer %s at %s  UUID=%s", p["name"], p["ip"], duuid)
 
     stop = threading.Event()
 
@@ -332,15 +347,15 @@ def main() -> None:
     signal.signal(signal.SIGINT, shutdown)
 
     # Bonjour / mDNS
-    zc = register_mdns()
+    zc = register_mdns(PRINTERS)
 
     # WS-Discovery
     wsd_sock = _make_wsd_socket()
     listener_thread = threading.Thread(
-        target=wsd_listener, args=(wsd_sock, stop), daemon=True
+        target=wsd_listener, args=(wsd_sock, stop, printer_map), daemon=True
     )
     hello_thread = threading.Thread(
-        target=wsd_hello_loop, args=(wsd_sock, stop), daemon=True
+        target=wsd_hello_loop, args=(wsd_sock, stop, printer_map), daemon=True
     )
     listener_thread.start()
     hello_thread.start()

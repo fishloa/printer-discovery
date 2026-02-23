@@ -1,0 +1,10 @@
+{
+  "printers": [
+    {
+      "name": "Zebra ZD621",
+      "ip": "192.168.30.4",
+      "location": "Alex Office Cupboard"
+    }
+  ],
+  "hello_interval": 120
+}
