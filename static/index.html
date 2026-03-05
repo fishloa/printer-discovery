@@ -4,95 +4,181 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Zebra Label Printer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://icomb.place/design-system/verdant-tokens.css">
+<link rel="stylesheet" href="https://icomb.place/design-system/verdant-base.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; color: #333; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 40px 20px; }
-  h1 { font-size: 1.5rem; margin-bottom: 24px; }
-
-  #drop-zone {
-    width: 400px; height: 180px; border: 3px dashed #ccc; border-radius: 12px;
-    display: flex; align-items: center; justify-content: center; flex-direction: column;
-    cursor: pointer; transition: all 0.2s; background: #fff;
+  body {
+    font-family: var(--vui-font-sans);
+    background: var(--vui-bg-deep);
+    color: var(--vui-text);
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100vh; padding: 48px 20px;
   }
-  #drop-zone.dragover { border-color: #2196F3; background: #e3f2fd; }
-  #drop-zone p { color: #999; font-size: 1rem; pointer-events: none; }
-  #drop-zone .icon { font-size: 2.5rem; margin-bottom: 8px; pointer-events: none; }
+
+  h1 {
+    font-size: var(--vui-text-xl);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: var(--vui-sp-6);
+  }
+
+  /* Drop zone */
+  #drop-zone {
+    width: 420px; height: 160px;
+    border: 2px dashed var(--vui-border);
+    border-radius: var(--vui-radius-lg);
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    cursor: pointer;
+    transition: all var(--vui-duration-fast) var(--vui-ease);
+    background: var(--vui-surface);
+  }
+  #drop-zone:hover { border-color: var(--vui-border-hover); background: var(--vui-surface-hover); }
+  #drop-zone.dragover { border-color: var(--vui-accent); background: var(--vui-accent-dim); }
+  #drop-zone p { color: var(--vui-text-muted); font-size: var(--vui-text-sm); pointer-events: none; }
+  #drop-zone .icon { font-size: 28px; margin-bottom: var(--vui-sp-2); pointer-events: none; color: var(--vui-text-dim); }
   #file-input { display: none; }
 
-  #preview-area { margin-top: 24px; display: none; flex-direction: column; align-items: center; gap: 0; }
-  #file-name { font-size: 0.85rem; color: #666; margin-bottom: 8px; }
+  /* Preview area */
+  #preview-area {
+    margin-top: var(--vui-sp-6);
+    display: none; flex-direction: column; align-items: center; gap: 0;
+  }
+  #file-name {
+    font-size: var(--vui-text-xs);
+    color: var(--vui-text-dim);
+    margin-bottom: var(--vui-sp-3);
+    font-family: var(--vui-font-mono);
+  }
 
-  /* Printer + label container */
+  /* Printer body */
   .printer-wrapper { position: relative; width: 340px; }
 
-  /* The ZD621 printer body — drawn with CSS */
   .printer-body {
-    width: 340px; height: 140px; background: #2d2d2d; border-radius: 16px 16px 12px 12px;
+    width: 340px; height: 130px;
+    background: var(--vui-surface);
+    border: 1px solid var(--vui-border);
+    border-radius: var(--vui-radius-lg) var(--vui-radius-lg) var(--vui-radius-md) var(--vui-radius-md);
     position: relative; z-index: 2;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: var(--vui-shadow-md);
   }
   .printer-body::before {
-    content: ''; position: absolute; top: 8px; left: 20px; right: 20px; height: 40px;
-    background: linear-gradient(180deg, #1a1a1a, #333); border-radius: 6px;
+    content: ''; position: absolute; top: 10px; left: 20px; right: 20px; height: 36px;
+    background: var(--vui-bg-deep);
+    border: 1px solid var(--vui-border);
+    border-radius: var(--vui-radius-sm);
   }
   .printer-body::after {
-    content: 'ZD621'; position: absolute; bottom: 12px; right: 20px;
-    color: #666; font-size: 0.75rem; font-weight: 600; letter-spacing: 1px;
+    content: 'ZD621'; position: absolute; bottom: 14px; right: 20px;
+    color: var(--vui-text-dim); font-size: var(--vui-text-xs);
+    font-weight: 600; letter-spacing: 1px;
+    font-family: var(--vui-font-mono);
   }
-  /* Zebra logo stripes */
+
   .printer-stripes {
-    position: absolute; top: 56px; left: 20px; display: flex; gap: 3px;
+    position: absolute; top: 54px; left: 20px; display: flex; gap: 3px;
   }
   .printer-stripes span {
-    display: block; width: 4px; height: 20px; background: #555; border-radius: 1px;
+    display: block; width: 4px; height: 18px;
+    background: var(--vui-border-hover); border-radius: 1px;
     transform: skewX(-10deg);
   }
-  /* Status LED */
+
   .printer-led {
-    position: absolute; top: 60px; right: 24px; width: 10px; height: 10px;
-    background: #4CAF50; border-radius: 50%;
-    box-shadow: 0 0 6px #4CAF50;
+    position: absolute; top: 58px; right: 24px;
+    width: 8px; height: 8px;
+    background: var(--vui-accent);
+    border-radius: var(--vui-radius-full);
+    box-shadow: 0 0 8px var(--vui-accent-glow);
     animation: blink 2s infinite;
   }
   @keyframes blink { 0%,90%,100% { opacity: 1; } 95% { opacity: 0.3; } }
 
-  /* Label slot — the gap where the label emerges */
   .printer-slot {
-    width: 300px; height: 8px; background: #1a1a1a; margin: 0 auto;
-    border-radius: 0 0 2px 2px; position: relative; z-index: 2;
+    width: 300px; height: 6px;
+    background: var(--vui-bg-deep);
+    border: 1px solid var(--vui-border);
+    border-top: none;
+    margin: 0 auto;
+    position: relative; z-index: 2;
   }
 
-  /* Label image — slides out below the printer */
   .label-output {
-    width: 280px; margin: 0 auto; position: relative; z-index: 1;
+    width: 280px; margin: 0 auto;
+    position: relative; z-index: 1;
     overflow: hidden;
   }
   .label-output img {
     width: 100%; display: block; padding: 0; margin: 0;
-    border: 1px solid #ddd; border-top: none; background: #fff;
-    animation: slideOut 0.6s ease-out;
+    border: 1px solid var(--vui-border);
+    border-top: none;
+    border-radius: 0 0 var(--vui-radius-sm) var(--vui-radius-sm);
+    background: #fff;
+    animation: slideOut 0.5s var(--vui-ease);
   }
   @keyframes slideOut {
     from { transform: translateY(-100%); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
   }
 
-  .btn-row { display: flex; gap: 12px; margin-top: 16px; }
+  /* Buttons */
+  .btn-row { display: flex; gap: var(--vui-sp-3); margin-top: var(--vui-sp-4); }
+
   button {
-    padding: 12px 32px; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; transition: all 0.15s;
+    padding: var(--vui-sp-3) var(--vui-sp-6);
+    font-size: var(--vui-text-sm);
+    font-weight: 600;
+    font-family: var(--vui-font-sans);
+    border: 1px solid transparent;
+    border-radius: var(--vui-radius-md);
+    cursor: pointer;
+    transition: all var(--vui-duration-fast) var(--vui-ease);
   }
-  #print-btn { background: #4CAF50; color: #fff; }
-  #print-btn:hover { background: #388E3C; }
-  #print-btn:disabled { background: #aaa; cursor: not-allowed; }
-  #clear-btn { background: #eee; color: #333; }
-  #clear-btn:hover { background: #ddd; }
 
-  #status { margin-top: 12px; font-size: 0.9rem; min-height: 1.2em; }
-  #status.success { color: #4CAF50; }
-  #status.error { color: #f44336; }
-  #status.loading { color: #2196F3; }
+  #print-btn {
+    background: var(--vui-accent);
+    color: var(--vui-accent-text);
+    border-color: var(--vui-accent);
+  }
+  #print-btn:hover { background: var(--vui-accent-hover); }
+  #print-btn:disabled {
+    background: var(--vui-surface);
+    color: var(--vui-text-dim);
+    border-color: var(--vui-border);
+    cursor: not-allowed;
+  }
 
-  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #2196F3; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+  #clear-btn {
+    background: var(--vui-surface);
+    color: var(--vui-text-muted);
+    border-color: var(--vui-border);
+  }
+  #clear-btn:hover {
+    background: var(--vui-surface-hover);
+    border-color: var(--vui-border-hover);
+    color: var(--vui-text);
+  }
+
+  /* Status */
+  #status {
+    margin-top: var(--vui-sp-3);
+    font-size: var(--vui-text-xs);
+    min-height: 1.4em;
+    font-family: var(--vui-font-mono);
+  }
+  #status.success { color: var(--vui-accent); }
+  #status.error { color: var(--vui-danger); }
+  #status.loading { color: var(--vui-info); }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--vui-info);
+    border-top-color: transparent;
+    border-radius: var(--vui-radius-full);
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle; margin-right: var(--vui-sp-1);
+  }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -101,7 +187,7 @@
 <h1>Zebra Label Printer</h1>
 
 <div id="drop-zone">
-  <div class="icon">&#128206;</div>
+  <div class="icon">&#9113;</div>
   <p>Drop a PDF, Word doc, or image here</p>
 </div>
 <input type="file" id="file-input" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.bmp,.tiff,.tif,.webp">
@@ -184,7 +270,7 @@ printBtn.addEventListener('click', async () => {
     const res = await fetch('/api/print', { method: 'POST', body: form });
     const data = await res.json();
     if (data.error) { setStatus('error', 'Print failed: ' + data.error); }
-    else { setStatus('success', `Sent to ${data.printer} (${data.ip})`); }
+    else { setStatus('success', 'Sent to ' + data.printer + ' (' + data.ip + ')'); }
   } catch (e) {
     setStatus('error', 'Print failed: connection error');
   }
