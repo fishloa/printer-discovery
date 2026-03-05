@@ -2,10 +2,12 @@
 """Web service for drag-and-drop label printing to a Zebra ZD621."""
 
 from flask import Flask, request, jsonify, send_from_directory
+from werkzeug.middleware.proxy_fix import ProxyFix
 from label_printer import process_and_preview, process_and_print, get_printer_config
 import base64
 
 app = Flask(__name__, static_folder="static")
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 
 @app.route("/")
