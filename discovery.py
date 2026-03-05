@@ -328,7 +328,12 @@ def wsd_hello_loop(sock: socket.socket, stop_event: threading.Event, printer_map
 # Main
 # ---------------------------------------------------------------------------
 
-def main() -> None:
+def main(block: bool = True) -> None:
+    """Start all discovery services.
+
+    If block=True (default, standalone mode), blocks until SIGTERM/SIGINT.
+    If block=False (embedded mode), starts threads and returns immediately.
+    """
     # Build printer map for WS-Discovery: {uuid: xaddrs}
     printer_map: dict[str, str] = {}
     for p in PRINTERS:
@@ -360,7 +365,10 @@ def main() -> None:
     listener_thread.start()
     hello_thread.start()
 
-    log.info("All discovery services running. Press Ctrl+C to stop.")
+    log.info("All discovery services running.")
+
+    if not block:
+        return
 
     # Block until signalled
     stop.wait()

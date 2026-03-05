@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zebra Label Printer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; color: #333; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 40px 20px; }
+  h1 { font-size: 1.5rem; margin-bottom: 24px; }
+
+  #drop-zone {
+    width: 400px; height: 180px; border: 3px dashed #ccc; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    cursor: pointer; transition: all 0.2s; background: #fff;
+  }
+  #drop-zone.dragover { border-color: #2196F3; background: #e3f2fd; }
+  #drop-zone p { color: #999; font-size: 1rem; pointer-events: none; }
+  #drop-zone .icon { font-size: 2.5rem; margin-bottom: 8px; pointer-events: none; }
+  #file-input { display: none; }
+
+  #preview-area { margin-top: 24px; display: none; flex-direction: column; align-items: center; gap: 0; }
+  #file-name { font-size: 0.85rem; color: #666; margin-bottom: 8px; }
+
+  /* Printer + label container */
+  .printer-wrapper { position: relative; width: 340px; }
+
+  /* The ZD621 printer body — drawn with CSS */
+  .printer-body {
+    width: 340px; height: 140px; background: #2d2d2d; border-radius: 16px 16px 12px 12px;
+    position: relative; z-index: 2;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .printer-body::before {
+    content: ''; position: absolute; top: 8px; left: 20px; right: 20px; height: 40px;
+    background: linear-gradient(180deg, #1a1a1a, #333); border-radius: 6px;
+  }
+  .printer-body::after {
+    content: 'ZD621'; position: absolute; bottom: 12px; right: 20px;
+    color: #666; font-size: 0.75rem; font-weight: 600; letter-spacing: 1px;
+  }
+  /* Zebra logo stripes */
+  .printer-stripes {
+    position: absolute; top: 56px; left: 20px; display: flex; gap: 3px;
+  }
+  .printer-stripes span {
+    display: block; width: 4px; height: 20px; background: #555; border-radius: 1px;
+    transform: skewX(-10deg);
+  }
+  /* Status LED */
+  .printer-led {
+    position: absolute; top: 60px; right: 24px; width: 10px; height: 10px;
+    background: #4CAF50; border-radius: 50%;
+    box-shadow: 0 0 6px #4CAF50;
+    animation: blink 2s infinite;
+  }
+  @keyframes blink { 0%,90%,100% { opacity: 1; } 95% { opacity: 0.3; } }
+
+  /* Label slot — the gap where the label emerges */
+  .printer-slot {
+    width: 300px; height: 8px; background: #1a1a1a; margin: 0 auto;
+    border-radius: 0 0 2px 2px; position: relative; z-index: 2;
+  }
+
+  /* Label image — slides out below the printer */
+  .label-output {
+    width: 280px; margin: 0 auto; position: relative; z-index: 1;
+    overflow: hidden;
+  }
+  .label-output img {
+    width: 100%; display: block; padding: 0; margin: 0;
+    border: 1px solid #ddd; border-top: none; background: #fff;
+    animation: slideOut 0.6s ease-out;
+  }
+  @keyframes slideOut {
+    from { transform: translateY(-100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .btn-row { display: flex; gap: 12px; margin-top: 16px; }
+  button {
+    padding: 12px 32px; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; transition: all 0.15s;
+  }
+  #print-btn { background: #4CAF50; color: #fff; }
+  #print-btn:hover { background: #388E3C; }
+  #print-btn:disabled { background: #aaa; cursor: not-allowed; }
+  #clear-btn { background: #eee; color: #333; }
+  #clear-btn:hover { background: #ddd; }
+
+  #status { margin-top: 12px; font-size: 0.9rem; min-height: 1.2em; }
+  #status.success { color: #4CAF50; }
+  #status.error { color: #f44336; }
+  #status.loading { color: #2196F3; }
+
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #2196F3; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<h1>Zebra Label Printer</h1>
+
+<div id="drop-zone">
+  <div class="icon">&#128206;</div>
+  <p>Drop a PDF, Word doc, or image here</p>
+</div>
+<input type="file" id="file-input" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.bmp,.tiff,.tif,.webp">
+
+<div id="preview-area">
+  <span id="file-name"></span>
+  <div class="printer-wrapper">
+    <div class="printer-body">
+      <div class="printer-stripes">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="printer-led"></div>
+    </div>
+    <div class="printer-slot"></div>
+    <div class="label-output">
+      <img id="preview-img" alt="Label preview">
+    </div>
+  </div>
+  <div class="btn-row">
+    <button id="print-btn">Print</button>
+    <button id="clear-btn">Clear</button>
+  </div>
+  <div id="status"></div>
+</div>
+
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const previewArea = document.getElementById('preview-area');
+const previewImg = document.getElementById('preview-img');
+const fileName = document.getElementById('file-name');
+const printBtn = document.getElementById('print-btn');
+const clearBtn = document.getElementById('clear-btn');
+const status = document.getElementById('status');
+
+let currentFile = null;
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const files = e.dataTransfer.files;
+  if (files.length) handleFile(files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFile(fileInput.files[0]); });
+
+async function handleFile(file) {
+  currentFile = file;
+  fileName.textContent = file.name;
+  setStatus('loading', '<span class="spinner"></span>Generating preview...');
+  previewArea.style.display = 'flex';
+  printBtn.disabled = true;
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const res = await fetch('/api/preview', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.error) { setStatus('error', data.error); return; }
+    previewImg.src = data.image;
+    printBtn.disabled = false;
+    setStatus('', '');
+  } catch (e) {
+    setStatus('error', 'Failed to generate preview');
+  }
+}
+
+printBtn.addEventListener('click', async () => {
+  if (!currentFile) return;
+  printBtn.disabled = true;
+  setStatus('loading', '<span class="spinner"></span>Printing...');
+
+  const form = new FormData();
+  form.append('file', currentFile);
+
+  try {
+    const res = await fetch('/api/print', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.error) { setStatus('error', 'Print failed: ' + data.error); }
+    else { setStatus('success', `Sent to ${data.printer} (${data.ip})`); }
+  } catch (e) {
+    setStatus('error', 'Print failed: connection error');
+  }
+  printBtn.disabled = false;
+});
+
+clearBtn.addEventListener('click', () => {
+  currentFile = null;
+  previewArea.style.display = 'none';
+  previewImg.src = '';
+  fileInput.value = '';
+  setStatus('', '');
+});
+
+function setStatus(cls, html) {
+  status.className = cls;
+  status.innerHTML = html;
+}
+</script>
+</body>
+</html>
