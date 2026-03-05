@@ -39,9 +39,9 @@
   }
   #drop-zone:hover { border-color: var(--vui-accent-border); background: var(--vui-surface-hover); }
   #drop-zone.dragover { border-color: var(--vui-accent); background: var(--vui-accent-dim); border-style: solid; }
-  #drop-zone p { color: var(--vui-text-muted); font-size: var(--vui-text-base); pointer-events: none; font-weight: 500; }
+  #drop-zone p { color: var(--vui-text); font-size: var(--vui-text-base); pointer-events: none; font-weight: 500; }
   #drop-zone .icon { font-size: 40px; pointer-events: none; color: var(--vui-accent); opacity: 0.7; }
-  #drop-zone .hint { color: var(--vui-text-dim); font-size: var(--vui-text-xs); pointer-events: none; }
+  #drop-zone .hint { color: var(--vui-text); font-size: var(--vui-text-xs); pointer-events: none; opacity: 0.7; }
   #file-input { display: none; }
 
   /* Preview area */
@@ -127,42 +127,25 @@
   }
 
   /* Buttons */
-  .btn-row { display: flex; gap: var(--vui-sp-3); margin-top: var(--vui-sp-4); }
+  .btn-row { display: flex; gap: 12px; margin-top: 16px; }
 
   button {
-    padding: var(--vui-sp-3) var(--vui-sp-6);
-    font-size: var(--vui-text-sm);
+    padding: 12px 32px;
+    font-size: 1rem;
     font-weight: 600;
     font-family: var(--vui-font-sans);
-    border: 1px solid transparent;
-    border-radius: var(--vui-radius-md);
+    border: none;
+    border-radius: 8px;
     cursor: pointer;
-    transition: all var(--vui-duration-fast) var(--vui-ease);
+    transition: all 0.15s;
   }
 
-  #print-btn {
-    background: var(--vui-accent);
-    color: var(--vui-accent-text);
-    border-color: var(--vui-accent);
-  }
-  #print-btn:hover { background: var(--vui-accent-hover); }
-  #print-btn:disabled {
-    background: var(--vui-surface);
-    color: var(--vui-text-dim);
-    border-color: var(--vui-border);
-    cursor: not-allowed;
-  }
+  #print-btn { background: #4CAF50; color: #fff; }
+  #print-btn:hover { background: #388E3C; }
+  #print-btn:disabled { background: #aaa; cursor: not-allowed; }
 
-  #clear-btn {
-    background: var(--vui-surface);
-    color: var(--vui-text-muted);
-    border-color: var(--vui-border);
-  }
-  #clear-btn:hover {
-    background: var(--vui-surface-hover);
-    border-color: var(--vui-border-hover);
-    color: var(--vui-text);
-  }
+  #clear-btn { background: #eee; color: #333; }
+  #clear-btn:hover { background: #ddd; }
 
   /* Status */
   #status {
