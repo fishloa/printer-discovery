@@ -18,26 +18,30 @@
   }
 
   h1 {
-    font-size: var(--vui-text-xl);
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    margin-bottom: var(--vui-sp-6);
+    font-size: var(--vui-text-2xl);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: var(--vui-sp-8);
+    color: var(--vui-accent);
   }
 
   /* Drop zone */
   #drop-zone {
-    width: 420px; height: 160px;
-    border: 2px dashed var(--vui-border);
-    border-radius: var(--vui-radius-lg);
+    width: 500px; min-height: 220px;
+    padding: var(--vui-sp-8);
+    border: 2px dashed var(--vui-border-hover);
+    border-radius: var(--vui-radius-xl);
     display: flex; align-items: center; justify-content: center; flex-direction: column;
+    gap: var(--vui-sp-3);
     cursor: pointer;
     transition: all var(--vui-duration-fast) var(--vui-ease);
     background: var(--vui-surface);
   }
-  #drop-zone:hover { border-color: var(--vui-border-hover); background: var(--vui-surface-hover); }
-  #drop-zone.dragover { border-color: var(--vui-accent); background: var(--vui-accent-dim); }
-  #drop-zone p { color: var(--vui-text-muted); font-size: var(--vui-text-sm); pointer-events: none; }
-  #drop-zone .icon { font-size: 28px; margin-bottom: var(--vui-sp-2); pointer-events: none; color: var(--vui-text-dim); }
+  #drop-zone:hover { border-color: var(--vui-accent-border); background: var(--vui-surface-hover); }
+  #drop-zone.dragover { border-color: var(--vui-accent); background: var(--vui-accent-dim); border-style: solid; }
+  #drop-zone p { color: var(--vui-text-muted); font-size: var(--vui-text-base); pointer-events: none; font-weight: 500; }
+  #drop-zone .icon { font-size: 40px; pointer-events: none; color: var(--vui-accent); opacity: 0.7; }
+  #drop-zone .hint { color: var(--vui-text-dim); font-size: var(--vui-text-xs); pointer-events: none; }
   #file-input { display: none; }
 
   /* Preview area */
@@ -187,8 +191,9 @@
 <h1>Zebra Label Printer</h1>
 
 <div id="drop-zone">
-  <div class="icon">&#9113;</div>
-  <p>Drop a PDF, Word doc, or image here</p>
+  <div class="icon">&#128206;</div>
+  <p>Drop a file here to print</p>
+  <span class="hint">PDF, Word, PNG, JPG, BMP, TIFF</span>
 </div>
 <input type="file" id="file-input" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.bmp,.tiff,.tif,.webp">
 
