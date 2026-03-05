@@ -235,7 +235,7 @@ async function handleFile(file) {
   form.append('file', file);
 
   try {
-    const res = await fetch('/api/preview', { method: 'POST', body: form });
+    const res = await fetch('./api/preview', { method: 'POST', body: form });
     const data = await res.json();
     if (data.error) { setStatus('error', data.error); return; }
     previewImg.src = data.image;
@@ -255,7 +255,7 @@ printBtn.addEventListener('click', async () => {
   form.append('file', currentFile);
 
   try {
-    const res = await fetch('/api/print', { method: 'POST', body: form });
+    const res = await fetch('./api/print', { method: 'POST', body: form });
     const data = await res.json();
     if (data.error) { setStatus('error', 'Print failed: ' + data.error); }
     else { setStatus('success', 'Sent to ' + data.printer + ' (' + data.ip + ')'); }
