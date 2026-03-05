@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   zebra-discovery:
-    image: ghcr.io/fishloa/zebra-discovery:latest
+    image: dockerregistry.icomb.place/zebra-discovery:latest
     container_name: zebra-discovery
     network_mode: host
     restart: unless-stopped
