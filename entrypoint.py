@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Unified entrypoint: runs mDNS/WS-Discovery + label printing web UI."""
+"""Entrypoint: runs the label-printing web UI.
 
-import threading
-import signal
-import sys
+mDNS / WS-Discovery for the printer is handled outside this container by
+avahi-daemon on the host (static service file + avahi-publish-address for
+the cross-subnet A record).
+"""
+
 import logging
 
 logging.basicConfig(
@@ -14,17 +16,11 @@ log = logging.getLogger("zebra")
 
 
 def main():
-    # Import after logging is configured
-    from discovery import main as discovery_main
     from web import app
     from label_printer import get_printer_config
 
     printer = get_printer_config()
     log.info("Printer: %s at %s", printer["name"], printer["ip"])
-
-    # Start discovery services (non-blocking — threads are daemonized)
-    discovery_main(block=False)
-    log.info("Discovery services started")
 
     # Run web server in the foreground
     log.info("Starting web UI on port 5555...")
