@@ -10,7 +10,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY discovery.py label_printer.py web.py entrypoint.py config.json ./
+COPY label_printer.py web.py entrypoint.py config.json ./
 COPY static/ ./static/
 
 EXPOSE 5555
