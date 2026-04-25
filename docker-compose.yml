@@ -5,4 +5,6 @@ services:
     image: dockerregistry.icomb.place/zebra-discovery:latest
     container_name: zebra-discovery
     network_mode: host
+    environment:
+      LAN_IP: ${LAN_IP:-192.168.16.4}
     restart: unless-stopped

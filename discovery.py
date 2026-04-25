@@ -4,10 +4,10 @@ for a Zebra ZD621 label printer at a fixed IP address.
 """
 
 import json
+import os
 import pathlib
 import uuid
 import socket
-import struct
 import threading
 import signal
 import sys
@@ -16,6 +16,12 @@ import logging
 from xml.etree import ElementTree as ET
 
 from zeroconf import Zeroconf, ServiceInfo
+
+# Bind discovery to a single host interface — without this, zeroconf and the
+# WS-Discovery socket pick up every interface (incl. 200+ docker bridges on a
+# host running many compose stacks), which both blows past the kernel's
+# igmp_max_memberships and trips false-positive NonUniqueNameException probes.
+LAN_IP = os.environ.get("LAN_IP", "192.168.16.4")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,7 +50,7 @@ def _device_uuid(ip: str) -> str:
 
 def register_mdns(printers: list[dict]) -> Zeroconf:
     """Register mDNS service records for every printer in the config."""
-    zc = Zeroconf()
+    zc = Zeroconf(interfaces=[LAN_IP])
 
     for p in printers:
         name = p["name"]
@@ -230,10 +236,11 @@ def _make_wsd_socket() -> socket.socket:
     except AttributeError:
         pass
     sock.bind(("", WSD_MCAST_PORT))
-    # Join multicast group on all interfaces
-    mreq = struct.pack("4sL", socket.inet_aton(WSD_MCAST_ADDR), socket.INADDR_ANY)
+    # Join multicast group on the LAN interface only
+    mreq = socket.inet_aton(WSD_MCAST_ADDR) + socket.inet_aton(LAN_IP)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-    # Set multicast TTL
+    # Send outgoing multicast via the LAN interface
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(LAN_IP))
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 4)
     return sock
 
